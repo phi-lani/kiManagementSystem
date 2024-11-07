@@ -12,11 +12,13 @@ type User struct {
 	Username   string    `gorm:"unique;not null"`
 	Email      string    `gorm:"unique;not null"`
 	Password   string    `gorm:"not null"`
-	Role       string    `gorm:"type:varchar(20);not null"`
-	MFAEnabled bool      `gorm:"default:false"`
-	MFASecret  string    `gorm:"type:varchar(255)"`
-	CreatedAt  time.Time `gorm:"autoCreateTime"`
-	UpdatedAt  time.Time `gorm:"autoUpdateTime"`
+	Role       string    `gorm:"type:varchar(20);not null"` // Role of the user (e.g., "user", "admin")
+	MFAEnabled bool      `gorm:"default:false"`             // Indicates if MFA is enabled
+	MFASecret  string    `gorm:"type:varchar(255)"`         // Secret key for MFA (if using an authenticator app)
+	OTP        string    `gorm:"type:varchar(6)"`           // OTP for email-based MFA
+	OTPExpiry  time.Time `gorm:""`                          // Expiry time for the OTP
+	CreatedAt  time.Time `gorm:"autoCreateTime"`            // Timestamp for when the user was created
+	UpdatedAt  time.Time `gorm:"autoUpdateTime"`            // Timestamp for when the user was last updated
 }
 
 // CreateUser creates a new user in the database

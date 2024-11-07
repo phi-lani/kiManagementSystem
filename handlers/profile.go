@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/phi-lani/kimanagementsystem/config"
@@ -73,6 +74,7 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user.Email = updatedUser.Email
 
 	if err := config.DB.Save(&user).Error; err != nil {
+		log.Printf("error updating profile: %v", err)
 		http.Error(w, "Error updating profile", http.StatusInternalServerError)
 		return
 	}
