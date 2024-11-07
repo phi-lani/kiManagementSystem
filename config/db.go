@@ -2,7 +2,6 @@ package config
 
 import (
 	"log"
-	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -11,8 +10,13 @@ import (
 var DB *gorm.DB
 
 func InitDB() {
-	dsn := os.Getenv("DB")
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	//dsn := os.Getenv("DB")
+	var err error
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DriverName: "pgx",
+		DSN:        "host=localhost port=5432 user=postgres password=#Pn19970104! dbname=newblockchain_db sslmode=disable",
+	}), &gorm.Config{})
+
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
@@ -21,5 +25,5 @@ func InitDB() {
 	log.Println("Database connected")
 
 	// Run migrations
-	//DB.AutoMigrate(&models.User{}, &models.KeyIndividualProfile{}, &models.StartupProfile{}, &models.UserDocument{})
+	// DB.AutoMigrate(&models.User{}, &models.KeyIndividualProfile{}, &models.StartupProfile{}, &models.UserDocument{})
 }
