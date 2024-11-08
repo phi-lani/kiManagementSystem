@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/phi-lani/kimanagementsystem/utils"
@@ -17,11 +18,20 @@ func TokenValidationMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Verify the token using the VerifyJWT function
-		_, err = utils.VerifyJWT(cookie.Value)
+		claims, err := utils.VerifyJWT(cookie.Value)
 		if err != nil {
 			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
 			return
 		}
+
+		// Extract the userID and role from the claims
+		userID := claims.UserID
+		role := claims.Role
+
+		// Set the userID in the request context
+		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx = context.WithValue(ctx, "role", role)
+		r = r.WithContext(ctx)
 
 		// If the token is valid, proceed to the next handler
 		next.ServeHTTP(w, r)

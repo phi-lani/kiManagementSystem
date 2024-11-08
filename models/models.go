@@ -68,10 +68,10 @@ type StartupProfile struct {
 
 // UserDocument model represents uploaded documents for verification purposes
 type UserDocument struct {
-	ID           uint   `gorm:"primaryKey"`
-	UserID       uint   `gorm:"not null"`
-	DocumentType string `gorm:"type:varchar(50)"`
-	FilePath     string
+	ID           uint      `gorm:"primaryKey"`
+	UserID       uint      `gorm:"not null"`
+	DocumentType string    `gorm:"type:varchar(50)"`
+	FileData     []byte    `gorm:"type:bytea"` // Use bytea for PostgreSQL
 	UploadedAt   time.Time `gorm:"autoCreateTime"`
 	Verified     bool      `gorm:"default:false"`
 }
@@ -84,4 +84,10 @@ type Message struct {
 	Subject     string    `gorm:"type:varchar(100);not null"`
 	Body        string    `gorm:"type:text;not null"`
 	CreatedAt   time.Time `gorm:"autoCreateTime"`
+}
+type OTP struct {
+	ID        uint      `gorm:"primaryKey"`
+	Email     string    `gorm:"unique;not null"` // Email associated with the OTP
+	Code      string    `gorm:"not null"`        // The OTP code
+	ExpiresAt time.Time // Expiration time for the OTP
 }

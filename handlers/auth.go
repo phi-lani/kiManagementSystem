@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -45,25 +46,38 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	otpCode := utils.GenerateOTP()
-	otpExpiry := time.Now().Add(10 * time.Minute)
+	otpExpiry := time.Now().Add(60 * time.Minute)
 
 	if err := utils.SendOTPViaEmail(req.Email, otpCode); err != nil {
 		http.Error(w, "Failed to send OTP email", http.StatusInternalServerError)
 		return
 	}
 
+	// Create the user in the database
 	user := models.User{
 		Username:   req.Username,
 		Email:      req.Email,
 		Password:   hashedPassword,
 		Role:       "user",
 		MFAEnabled: true,
-		OTP:        otpCode,
-		OTPExpiry:  otpExpiry,
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
 		http.Error(w, "Error creating user", http.StatusInternalServerError)
+		return
+	}
+
+	// Store the OTP in the OTP table
+	otpRecord := models.OTP{
+		Email:     req.Email,
+		Code:      otpCode,
+		ExpiresAt: otpExpiry,
+	}
+
+	log.Printf("Register stored: email=%s, otp=%s", otpRecord.Email, otpRecord.Code)
+
+	if err := config.DB.Create(&otpRecord).Error; err != nil {
+		http.Error(w, "Failed to store OTP", http.StatusInternalServerError)
 		return
 	}
 
@@ -101,7 +115,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate a JWT token
-	token, err := utils.GenerateJWT(user.ID, user.Username)
+	token, err := utils.GenerateJWT(user.ID, user.Username, user.Role)
 	if err != nil {
 		http.Error(w, "Error generating token", http.StatusInternalServerError)
 		return
@@ -120,13 +134,4 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Login successful",
 		"token":   token})
-}
-
-// Helper function to check if username or email already exists
-func userExists(username, email string) bool {
-	var user models.User
-	if err := config.DB.Where("username = ? OR email = ?", username, email).First(&user).Error; err == nil {
-		return true // User with username or email already exists
-	}
-	return false
 }
