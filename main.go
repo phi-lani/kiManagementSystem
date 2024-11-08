@@ -13,11 +13,12 @@ import (
 )
 
 func main() {
-
+	// Load environment variables
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
+
 	// Initialize the database connection
 	config.InitDB()
 
@@ -38,21 +39,32 @@ func main() {
 	// Create a new router
 	router := mux.NewRouter()
 
-	// Define routes
-	router.HandleFunc("/register", handlers.Register).Methods("POST")
+	// Public routes
+	router.HandleFunc("/register/startup", handlers.RegisterStartup).Methods("POST")             // Route for Startup registration
+	router.HandleFunc("/register/keyindividual", handlers.RegisterKeyIndividual).Methods("POST") // Route for Key Individual registration
 	router.HandleFunc("/verify-otp", handlers.VerifyOTP).Methods("POST")
 	router.HandleFunc("/login", handlers.Login).Methods("POST")
-	// router.HandleFunc("/send-otp", handlers.SendOTP).Methods("GET")
+	//router.HandleFunc("/send-otp", handlers.SendOTP).Methods("GET") // Route for sending OTP
 
 	// Protected routes using middleware for token validation
 	router.Handle("/uploadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.UploadDocument))).Methods("POST")
 	router.Handle("/viewProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.ViewProfile))).Methods("GET")
 	router.Handle("/updateProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.UpdateProfile))).Methods("PUT")
 	router.Handle("/downloadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.DownloadDocument))).Methods("GET")
-	router.Handle("/viewUnverifiedDocuments", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.ViewUnverifiedDocuments))).Methods("GET")
-	router.Handle("/verifyDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.VerifyDocument))).Methods("POST")
-	// router.Handle("/sendMessage", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.SendMessage))).Methods("POST")
-	// router.Handle("/viewMessages", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.ViewMessages))).Methods("GET")
+
+	// Startup-specific routes
+	startupRouter := router.PathPrefix("/startup").Subrouter()
+	startupRouter.Use(middleware.TokenValidationMiddleware)
+	startupRouter.Use(middleware.StartupOnly)
+	startupRouter.HandleFunc("/searchKeyIndividuals", handlers.SearchKeyIndividuals).Methods("GET")
+	startupRouter.HandleFunc("/sendMessage", handlers.SendMessage).Methods("POST") // Route to send messages
+
+	// Admin-only routes (secured with token validation and role check)
+	adminRouter := router.PathPrefix("/admin").Subrouter()
+	adminRouter.Use(middleware.TokenValidationMiddleware) // Ensure the user is authenticated
+	adminRouter.Use(middleware.AdminOnly)                 // Ensure the user has an admin role
+	adminRouter.HandleFunc("/viewUnverifiedDocuments", handlers.ViewUnverifiedDocuments).Methods("GET")
+	adminRouter.HandleFunc("/verifyDocument", handlers.VerifyDocument).Methods("POST")
 
 	// Start the server
 	log.Println("Server is running on port 8080")

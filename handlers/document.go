@@ -118,58 +118,6 @@ func DownloadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func VerifyDocument(w http.ResponseWriter, r *http.Request) {
-// 	// Check if the user has an admin role
-// 	role := r.Context().Value("role").(string)
-// 	if role != "admin" {
-// 		http.Error(w, "Forbidden: Only admins can verify or reject documents", http.StatusForbidden)
-// 		return
-// 	}
-
-// 	// Get the document ID from the URL query parameters
-// 	documentIDStr := r.URL.Query().Get("documentID")
-// 	if documentIDStr == "" {
-// 		http.Error(w, "Document ID is required", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Convert document ID from string to uint
-// 	documentID, err := strconv.ParseUint(documentIDStr, 10, 32)
-// 	if err != nil {
-// 		http.Error(w, "Invalid Document ID", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Parse the request body to get the verification status
-// 	var req VerifyDocumentRequest
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		http.Error(w, "Invalid input", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Retrieve the document from the database
-// 	var document models.UserDocument
-// 	if err := config.DB.First(&document, uint(documentID)).Error; err != nil {
-// 		http.Error(w, "Document not found", http.StatusNotFound)
-// 		return
-// 	}
-
-// 	// Update the verification status
-// 	document.Verified = req.Verified
-// 	if err := config.DB.Save(&document).Error; err != nil {
-// 		http.Error(w, "Error updating document status", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	// Respond with a success message
-// 	w.WriteHeader(http.StatusOK)
-// 	if req.Verified {
-// 		w.Write([]byte("Document verified successfully"))
-// 	} else {
-// 		w.Write([]byte("Document rejected successfully"))
-// 	}
-// }
-
 func ViewUnverifiedDocuments(w http.ResponseWriter, r *http.Request) {
 	// Check if the user has an admin role
 	role, ok := r.Context().Value("role").(string)
@@ -190,6 +138,19 @@ func ViewUnverifiedDocuments(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(unverifiedDocuments)
 }
 
+// AdminOnly ensures that only users with the "admin" role can access the endpoint
+func AdminOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := r.Context().Value("user").(*models.User)
+		if !ok || user.Role != "admin" {
+			http.Error(w, "Forbidden: Admins only", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// VerifyDocument handles verifying or rejecting a document
 func VerifyDocument(w http.ResponseWriter, r *http.Request) {
 	// Check if the user has an admin role
 	role := r.Context().Value("role").(string)

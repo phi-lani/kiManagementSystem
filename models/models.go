@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/phi-lani/kimanagementsystem/config"
 )
 
@@ -35,35 +36,32 @@ func GetUserByUsername(username string) (*User, error) {
 	return &user, nil
 }
 
-// KeyIndividualProfile model represents additional details for Key Individuals
+// KeyIndividualProfile defines the schema for key individuals
 type KeyIndividualProfile struct {
-	UserID              uint `gorm:"primaryKey"`
-	FullName            string
-	ContactNumber       string
-	Location            string
-	LinkedInProfile     string
-	Qualification       string
-	ClassOfBusiness     string
-	FSPLicenseNumber    string
-	LicenseCategory     string
-	REExamResults       string
-	CPDPoints           int
-	ExperienceHistory   string
-	CryptoWalletAddress string
-	VerificationStatus  bool `gorm:"default:false"`
+	ID              uint           `gorm:"primaryKey"`
+	UserID          uint           `gorm:"not null"`          // Foreign key linking to the User model
+	User            User           `gorm:"foreignKey:UserID"` // Association with the User model
+	FullName        string         `gorm:"not null"`          // Full name of the key individual
+	Qualifications  pq.StringArray `gorm:"type:text[]"`       // Array of qualifications
+	Experience      pq.StringArray `gorm:"type:text[]"`       // Array of experiences
+	ContactDetails  string         `gorm:"not null"`          // Contact details
+	Area            string         `gorm:"not null"`          // Area where the key individual operates
+	AssetTypes      pq.StringArray `gorm:"type:text[]"`       // Array of asset types managed
+	ClassOfBusiness pq.StringArray `gorm:"type:text[]"`       // Array of class of business
+	REExams         pq.StringArray `gorm:"type:text[]"`       // Array of RE exam results
+	CPDPoints       int            `gorm:"default:0"`         // CPD points
 }
 
-// StartupProfile model represents additional details for Startups
+// StartupProfile defines the schema for startups
 type StartupProfile struct {
-	UserID              uint `gorm:"primaryKey"`
-	CompanyName         string
-	ContactNumber       string
-	Location            string
-	Website             string
-	Industry            string
-	SearchPreferences   string
-	CryptoWalletAddress string
-	VerificationStatus  bool `gorm:"default:false"`
+	ID                 uint   `gorm:"primaryKey"`
+	UserID             uint   `gorm:"not null"`          // Foreign key linking to the User model
+	User               User   `gorm:"foreignKey:UserID"` // Association with the User model
+	Name               string `gorm:"not null"`          // Name of the startup
+	Industry           string // Industry of the startup
+	Website            string // Optional website URL
+	ContactInformation string `gorm:"not null"` // Contact information
+	Area               string `gorm:"not null"` // Area where the startup is located
 }
 
 // UserDocument model represents uploaded documents for verification purposes
@@ -83,7 +81,7 @@ type Message struct {
 	RecipientID uint      `gorm:"not null"` // KI's UserID
 	Subject     string    `gorm:"type:varchar(100);not null"`
 	Body        string    `gorm:"type:text;not null"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	SentAt      time.Time `gorm:"autoCreateTime"`
 }
 type OTP struct {
 	ID        uint      `gorm:"primaryKey"`
