@@ -40,6 +40,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// Public routes
+	router.HandleFunc("/register/admin", handlers.RegisterAdmin).Methods("POST")
 	router.HandleFunc("/register/startup", handlers.RegisterStartup).Methods("POST")             // Route for Startup registration
 	router.HandleFunc("/register/keyindividual", handlers.RegisterKeyIndividual).Methods("POST") // Route for Key Individual registration
 	router.HandleFunc("/verify-otp", handlers.VerifyOTP).Methods("POST")
@@ -65,6 +66,7 @@ func main() {
 	adminRouter.Use(middleware.AdminOnly)                 // Ensure the user has an admin role
 	adminRouter.HandleFunc("/viewUnverifiedDocuments", handlers.ViewUnverifiedDocuments).Methods("GET")
 	adminRouter.HandleFunc("/verifyDocument", handlers.VerifyDocument).Methods("POST")
+	//adminRouter.HandleFunc("/downloadLogs", handlers.DownloadLogs).Methods("GET")
 
 	// Start the server
 	log.Println("Server is running on port 8080")

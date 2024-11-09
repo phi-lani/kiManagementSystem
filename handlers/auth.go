@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/phi-lani/kimanagementsystem/config"
 	"github.com/phi-lani/kimanagementsystem/models"
 	"github.com/phi-lani/kimanagementsystem/utils"
@@ -17,6 +19,41 @@ type RegistrationRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+// Request struct for registering a key individual
+type KeyIndividualRegistrationRequest struct {
+	Username        string   `json:"username"`
+	Email           string   `json:"email"`
+	Password        string   `json:"password"`
+	FullName        string   `json:"full_name"`
+	Qualifications  []string `json:"qualifications"`
+	Experience      []string `json:"experience"`
+	ContactDetails  string   `json:"contact_details"`
+	Area            string   `json:"area"`
+	AssetTypes      []string `json:"asset_types"`
+	ClassOfBusiness []string `json:"class_of_business"`
+	REExams         []string `json:"re_exams"`
+	CPDPoints       int      `json:"cpd_points"`
+}
+
+// Request struct for registering a startup
+type StartupRegistrationRequest struct {
+	Username           string `json:"username"`
+	Email              string `json:"email"`
+	Password           string `json:"password"`
+	Name               string `json:"name"`
+	Industry           string `json:"industry"`
+	Website            string `json:"website"`
+	ContactInformation string `json:"contact_information"`
+	Area               string `json:"area"`
+}
+
+type SearchKeyIndividualsRequest struct {
+	Qualifications  []string `json:"qualifications"`
+	Experience      []string `json:"experience"`
+	Area            string   `json:"area"`
+	ClassOfBusiness []string `json:"class_of_business"` // Updated field
 }
 
 // Register handles user registration and sends an OTP for email-based MFA
@@ -136,22 +173,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		"token":   token})
 }
 
-// Request struct for registering a key individual
-type KeyIndividualRegistrationRequest struct {
-	Username        string   `json:"username"`
-	Email           string   `json:"email"`
-	Password        string   `json:"password"`
-	FullName        string   `json:"full_name"`
-	Qualifications  []string `json:"qualifications"`
-	Experience      []string `json:"experience"`
-	ContactDetails  string   `json:"contact_details"`
-	Area            string   `json:"area"`
-	AssetTypes      []string `json:"asset_types"`
-	ClassOfBusiness []string `json:"class_of_business"`
-	REExams         []string `json:"re_exams"`
-	CPDPoints       int      `json:"cpd_points"`
-}
-
 // RegisterKeyIndividual handles the registration of a key individual
 func RegisterKeyIndividual(w http.ResponseWriter, r *http.Request) {
 	var req KeyIndividualRegistrationRequest
@@ -241,18 +262,6 @@ func RegisterKeyIndividual(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Key Individual registered successfully. Check your email for the OTP code.")
 }
 
-// Request struct for registering a startup
-type StartupRegistrationRequest struct {
-	Username           string `json:"username"`
-	Email              string `json:"email"`
-	Password           string `json:"password"`
-	Name               string `json:"name"`
-	Industry           string `json:"industry"`
-	Website            string `json:"website"`
-	ContactInformation string `json:"contact_information"`
-	Area               string `json:"area"`
-}
-
 // RegisterStartup handles the registration of startups and sends an OTP for email verification
 func RegisterStartup(w http.ResponseWriter, r *http.Request) {
 	var req StartupRegistrationRequest
@@ -338,16 +347,10 @@ func RegisterStartup(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Startup registered successfully. Check your email for the OTP code.")
 }
 
-type SearchKeyIndividualsRequest struct {
-	Qualifications  []string `json:"qualifications"`
-	Experience      []string `json:"experience"`
-	Area            string   `json:"area"`
-	ClassOfBusiness []string `json:"class_of_business"` // Updated field
-}
-
 func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 	var req SearchKeyIndividualsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("Error decoding JSON: %v", err)
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
@@ -357,12 +360,12 @@ func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 
 	// Filter by qualifications if provided
 	if len(req.Qualifications) > 0 {
-		query = query.Where("qualifications && ?", req.Qualifications) // Using PostgreSQL array overlap operator
+		query = query.Where("qualifications && ?", pq.Array(req.Qualifications)) // Using PostgreSQL array overlap operator
 	}
 
 	// Filter by experience if provided
 	if len(req.Experience) > 0 {
-		query = query.Where("experience && ?", req.Experience) // Using PostgreSQL array overlap operator
+		query = query.Where("experience && ?", pq.Array(req.Experience)) // Using PostgreSQL array overlap operator
 	}
 
 	// Filter by area if provided
@@ -372,7 +375,7 @@ func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 
 	// Filter by class of business if provided
 	if len(req.ClassOfBusiness) > 0 {
-		query = query.Where("class_of_business && ?", req.ClassOfBusiness) // Using PostgreSQL array overlap operator
+		query = query.Where("class_of_business && ?", pq.Array(req.ClassOfBusiness)) // Using PostgreSQL array overlap operator
 	}
 
 	// Execute the query and fetch results
@@ -385,4 +388,118 @@ func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 	// Respond with the search results
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(keyIndividuals)
+}
+
+// LoginAdmin handles admin login with MFA
+func LoginAdmin(w http.ResponseWriter, r *http.Request) {
+	var req RegistrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Retrieve the user from the database
+	var user models.User
+	if err := config.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		http.Error(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if the user is an admin
+	if user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admin access only", http.StatusForbidden)
+		return
+	}
+
+	// Verify the password
+	if !utils.CheckPasswordHash(req.Password, user.Password) {
+		http.Error(w, "Invalid password", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if MFA is enabled for the admin
+	if user.MFAEnabled {
+		// Generate an OTP and send it to the admin's email
+		otpCode := utils.GenerateOTP()
+		user.OTP = otpCode
+		user.OTPExpiry = time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
+		config.DB.Save(&user)
+
+		// Send the OTP via email
+		utils.SendOTPViaEmail(user.Email, otpCode)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode("OTP sent to your email for MFA verification")
+		return
+	}
+
+	// Generate a JWT token if MFA is not required
+	token, err := utils.GenerateJWT(user.ID, user.Username, user.Role)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+// RegisterAdmin registers a new admin user and sends an OTP for MFA
+func RegisterAdmin(w http.ResponseWriter, r *http.Request) {
+	// Check for the API key in the request headers
+	apiKey := r.Header.Get("X-API-Key")
+	if apiKey != os.Getenv("ADMIN_API_KEY") {
+		http.Error(w, "Unauthorized access", http.StatusUnauthorized)
+		return
+	}
+
+	var req RegistrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the username or email already exists
+	var existingUser models.User
+	if err := config.DB.Where("username = ? OR email = ?", req.Username, req.Email).First(&existingUser).Error; err == nil {
+		http.Error(w, "Username or email already exists", http.StatusConflict)
+		return
+	}
+
+	// Hash the password
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate an OTP
+	otpCode := utils.GenerateOTP()
+	otpExpiry := time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
+
+	// Create the admin user
+	adminUser := models.User{
+		Username:   req.Username,
+		Email:      req.Email,
+		Password:   hashedPassword,
+		Role:       "admin", // Set the role to "admin"
+		MFAEnabled: true,    // Enable MFA for added security
+		OTP:        otpCode,
+		OTPExpiry:  otpExpiry,
+	}
+
+	// Save the admin user to the database
+	if err := config.DB.Create(&adminUser).Error; err != nil {
+		http.Error(w, "Error creating admin user", http.StatusInternalServerError)
+		return
+	}
+
+	// Send the OTP via email
+	if err := utils.SendOTPViaEmail(adminUser.Email, otpCode); err != nil {
+		http.Error(w, "Failed to send OTP email", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode("Admin registered successfully. Check your email for the OTP code.")
 }
