@@ -512,6 +512,18 @@ func RegisterAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	otpRecord := models.OTP{
+		Email:     req.Email,
+		Code:      otpCode,
+		ExpiresAt: otpExpiry,
+	}
+
+	if err := config.DB.Create(&otpRecord).Error; err != nil {
+		log.Printf("Error saving OTP: %v", err) // Log the error
+		http.Error(w, "Failed to generate OTP", http.StatusInternalServerError)
+		return
+	}
+
 	// Send the OTP via email
 	if err := utils.SendOTPViaEmail(adminUser.Email, otpCode); err != nil {
 		http.Error(w, "Failed to send OTP email", http.StatusInternalServerError)

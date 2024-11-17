@@ -98,6 +98,7 @@ func VerifyDocument(w http.ResponseWriter, r *http.Request) {
 
 // ViewUnverifiedDocuments allows admins to view all unverified documents
 func ViewUnverifiedDocuments(w http.ResponseWriter, r *http.Request) {
+	log.Println("ViewUnverifiedDocuments endpoint hit")
 	// Ensure the user is an admin
 	role, ok := r.Context().Value("role").(string)
 	if !ok || role != "admin" {

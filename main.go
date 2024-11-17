@@ -12,6 +12,12 @@ import (
 	"github.com/phi-lani/kimanagementsystem/models"
 )
 
+// Deploy the smart contract
+// npx hardhat ignition deploy ./ignition/modules/KIManagement.ts --network localhost
+
+// Run the ethereum node
+// npx hardhat node
+
 func main() {
 	// Load environment variables
 	err := godotenv.Load()
