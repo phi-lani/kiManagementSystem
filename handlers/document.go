@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/phi-lani/kimanagementsystem/config"
 	"github.com/phi-lani/kimanagementsystem/models"
+	"github.com/phi-lani/kimanagementsystem/utils"
 )
 
 // type VerifyDocumentRequest struct {
@@ -54,6 +56,9 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate a hash for the document
+	documentHash := utils.GenerateHash(fileData)
+
 	// Get the document type from the form data
 	documentType := r.FormValue("documentType")
 	if documentType == "" {
@@ -65,18 +70,30 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 	document := models.UserDocument{
 		UserID:       userID,
 		DocumentType: documentType,
-		//FilePath:     "",
-		FileData:   fileData, // Storing file content as binary data
-		UploadedAt: time.Now(),
-		Verified:   false,
+		FileData:     fileData, // Storing file content as binary data
+		UploadedAt:   time.Now(),
+		Verified:     false,
+		Hash:         documentHash, // Store the generated hash
 	}
 	if err := config.DB.Create(&document).Error; err != nil {
 		http.Error(w, "Error saving document information", http.StatusInternalServerError)
 		return
 	}
 
+	contract := config.GetContractInstance()
+	auth := config.GetAuth()
+
+	// Call the smart contract's UploadDocument method
+	//documentHash := "DOCUMENT_HASH" // Replace with the actual hash of the uploaded document
+	tx, err := contract.UploadDocument(auth, documentHash)
+	if err != nil {
+		http.Error(w, "Failed to upload document on the blockchain", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Transaction sent: %s", tx.Hash().Hex())
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("File uploaded and stored in the database successfully"))
+	w.Write([]byte("File uploaded and stored in the database successfully with hash: " + documentHash))
 }
 
 func DownloadDocument(w http.ResponseWriter, r *http.Request) {
@@ -116,26 +133,6 @@ func DownloadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func ViewUnverifiedDocuments(w http.ResponseWriter, r *http.Request) {
-// 	// Check if the user has an admin role
-// 	role, ok := r.Context().Value("role").(string)
-// 	if !ok || role != "admin" {
-// 		http.Error(w, "Forbidden: Only admins can view unverified documents", http.StatusForbidden)
-// 		return
-// 	}
-
-// 	// Retrieve all unverified documents from the database
-// 	var unverifiedDocuments []models.UserDocument
-// 	if err := config.DB.Where("verified = ?", false).Find(&unverifiedDocuments).Error; err != nil {
-// 		http.Error(w, "Error fetching unverified documents", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	// Respond with the list of unverified documents
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(unverifiedDocuments)
-// }
-
 // AdminOnly ensures that only users with the "admin" role can access the endpoint
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -147,78 +144,3 @@ func AdminOnly(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-// VerifyDocument handles verifying or rejecting a document
-// func VerifyDocument(w http.ResponseWriter, r *http.Request) {
-// 	// Check if the user has an admin role
-// 	role := r.Context().Value("role").(string)
-// 	if role != "admin" {
-// 		http.Error(w, "Forbidden: Only admins can verify or reject documents", http.StatusForbidden)
-// 		return
-// 	}
-
-// 	// Get the document ID from the URL query parameters
-// 	documentIDStr := r.URL.Query().Get("documentID")
-// 	if documentIDStr == "" {
-// 		http.Error(w, "Document ID is required", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Convert document ID from string to uint
-// 	documentID, err := strconv.ParseUint(documentIDStr, 10, 32)
-// 	if err != nil {
-// 		http.Error(w, "Invalid Document ID", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Parse the request body to get the verification status
-// 	var req VerifyDocumentRequest
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		http.Error(w, "Invalid input", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Retrieve the document from the database
-// 	var document models.UserDocument
-// 	if err := config.DB.First(&document, uint(documentID)).Error; err != nil {
-// 		http.Error(w, "Document not found", http.StatusNotFound)
-// 		return
-// 	}
-
-// 	// Retrieve the email of the user associated with the document
-// 	var user models.User
-// 	if err := config.DB.First(&user, document.UserID).Error; err != nil {
-// 		http.Error(w, "User not found", http.StatusNotFound)
-// 		return
-// 	}
-
-// 	// Update the verification status
-// 	document.Verified = req.Verified
-// 	if err := config.DB.Save(&document).Error; err != nil {
-// 		http.Error(w, "Error updating document status", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	// Prepare email content
-// 	subject := "Document Verification Status Update"
-// 	status := "verified"
-// 	if !req.Verified {
-// 		status = "rejected"
-// 	}
-// 	body := "Dear " + user.Username + ",\n\nYour document has been " + status + ".\n\nThank you."
-
-// 	// Send the email notification
-// 	err = utils.SendEmail(user.Email, subject, body)
-// 	if err != nil {
-// 		http.Error(w, "Failed to send email notification", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	// Respond with a success message
-// 	w.WriteHeader(http.StatusOK)
-// 	if req.Verified {
-// 		w.Write([]byte("Document verified successfully"))
-// 	} else {
-// 		w.Write([]byte("Document rejected successfully"))
-// 	}
-// }

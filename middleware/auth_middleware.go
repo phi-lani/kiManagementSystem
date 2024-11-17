@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/phi-lani/kimanagementsystem/models"
@@ -43,8 +44,9 @@ func TokenValidationMiddleware(next http.Handler) http.Handler {
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := r.Context().Value("user").(*models.User)
+		log.Printf("The current role is %s: ", user.Role)
 		if !ok || user.Role != "admin" {
-			http.Error(w, "Forbidden: Admins only", http.StatusForbidden)
+			http.Error(w, "Forbidden: Admins access only", http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -55,6 +57,7 @@ func AdminOnly(next http.Handler) http.Handler {
 func KeyIndividualOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		role, ok := r.Context().Value("role").(string)
+		log.Printf("The current role is %s: ", role)
 		if !ok || role != "key_individual" {
 			http.Error(w, "Forbidden: Key Individual access only", http.StatusForbidden)
 			return

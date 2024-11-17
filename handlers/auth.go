@@ -15,6 +15,11 @@ import (
 	"github.com/phi-lani/kimanagementsystem/utils"
 )
 
+// // Smart contract variables
+// var contractAddress = common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3") // Replace with your contract address
+// var backend = config.GetBlockchainBackend()                                             // Implement this to get your Ethereum client
+// var auth = config.GetAuth()
+
 type RegistrationRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -257,6 +262,19 @@ func RegisterKeyIndividual(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error creating key individual profile", http.StatusInternalServerError)
 		return
 	}
+
+	// Use the smart contract instance and `auth` from config
+	contract := config.GetContractInstance()
+	auth := config.GetAuth()
+
+	// Call the smart contract's RegisterKI method
+	tx, err := contract.RegisterKI(auth, req.FullName, req.Qualifications[0], req.AssetTypes[0], req.Experience[0])
+	if err != nil {
+		http.Error(w, "Failed to register KI on the blockchain", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Transaction sent: %s", tx.Hash().Hex())
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode("Key Individual registered successfully. Check your email for the OTP code.")

@@ -23,7 +23,4 @@ func InitDB() {
 
 	DB = db
 	log.Println("Database connected")
-
-	// Run migrations
-	// DB.AutoMigrate(&models.User{}, &models.KeyIndividualProfile{}, &models.StartupProfile{}, &models.UserDocument{})
 }

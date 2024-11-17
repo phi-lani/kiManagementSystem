@@ -20,6 +20,7 @@ type User struct {
 	OTPExpiry  time.Time `gorm:""`                          // Expiry time for the OTP
 	CreatedAt  time.Time `gorm:"autoCreateTime"`            // Timestamp for when the user was created
 	UpdatedAt  time.Time `gorm:"autoUpdateTime"`            // Timestamp for when the user was last updated
+	Address    string    `gorm:"type:varchar(255)"`
 }
 
 // CreateUser creates a new user in the database
@@ -69,7 +70,8 @@ type UserDocument struct {
 	ID           uint      `gorm:"primaryKey"`
 	UserID       uint      `gorm:"not null"`
 	DocumentType string    `gorm:"type:varchar(50)"`
-	FileData     []byte    `gorm:"type:bytea"` // Use bytea for PostgreSQL
+	FileData     []byte    `gorm:"type:bytea"`                // Use bytea for PostgreSQL
+	Hash         string    `gorm:"type:varchar(64);not null"` // SHA-256 hash of the document
 	UploadedAt   time.Time `gorm:"autoCreateTime"`
 	Verified     bool      `gorm:"default:false"`
 }
