@@ -10,35 +10,74 @@ import (
 	"github.com/phi-lani/kimanagementsystem/utils"
 )
 
-// ViewProfile handles retrieving the user's profile
+// // ViewProfile handles retrieving the user's profile
+// func ViewProfile(w http.ResponseWriter, r *http.Request) {
+// 	// Retrieve the token from the request cookie
+// 	cookie, err := r.Cookie("token")
+// 	if err != nil {
+// 		http.Error(w, "Unauthorized: No token provided", http.StatusUnauthorized)
+// 		return
+// 	}
+
+// 	// Parse and verify the token
+// 	claims, err := utils.VerifyJWT(cookie.Value)
+// 	if err != nil {
+// 		http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
+// 		return
+// 	}
+
+// 	// Retrieve the username from the claims
+// 	username := claims.Username
+
+// 	// Find the user by username
+// 	var user models.User
+// 	if err := config.DB.Where("username = ?", username).First(&user).Error; err != nil {
+// 		http.Error(w, "User not found", http.StatusNotFound)
+// 		return
+// 	}
+
+// 	// Respond with the user profile in JSON format
+// 	w.WriteHeader(http.StatusOK)
+// 	json.NewEncoder(w).Encode(user)
+// }
+
 func ViewProfile(w http.ResponseWriter, r *http.Request) {
-	// Retrieve the token from the request cookie
-	cookie, err := r.Cookie("token")
-	if err != nil {
+	// Retrieve the token from the Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
 		http.Error(w, "Unauthorized: No token provided", http.StatusUnauthorized)
 		return
 	}
 
+	// Extract the token (remove the "Bearer " prefix)
+	tokenString := authHeader[len("Bearer "):]
+
 	// Parse and verify the token
-	claims, err := utils.VerifyJWT(cookie.Value)
+	claims, err := utils.VerifyJWT(tokenString)
 	if err != nil {
 		http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
 		return
 	}
 
 	// Retrieve the username from the claims
-	username := claims.Username
+	userID := claims.UserID
 
 	// Find the user by username
-	var user models.User
-	if err := config.DB.Where("username = ?", username).First(&user).Error; err != nil {
+	var profile models.StartupProfile
+	if err := config.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
+	// var profile models.StartupProfile
+	// if err := config.DB.Where("name = ?", userID).First(&profile).Error; err != nil {
+	// 	http.Error(w, "Startup profile not found", http.StatusNotFound)
+	// 	return
+	// }
+
 	// Respond with the user profile in JSON format
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(profile)
 }
 
 // UpdateProfile handles updating the user's profile
