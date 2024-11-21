@@ -35,6 +35,19 @@ func GenerateJWT(userID uint, username string, role string) (string, error) {
 	return token.SignedString(jwtKey)
 }
 
+// func VerifyJWT(tokenString string) (*Claims, error) {
+// 	claims := &Claims{}
+// 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+// 		return jwtKey, nil
+// 	})
+
+// 	if err != nil || !token.Valid {
+// 		return nil, errors.New("invalid token")
+// 	}
+
+// 	return claims, nil
+// }
+
 func VerifyJWT(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
@@ -43,6 +56,11 @@ func VerifyJWT(tokenString string) (*Claims, error) {
 
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid token")
+	}
+
+	// Check for token expiration
+	if time.Now().Unix() > claims.ExpiresAt {
+		return nil, errors.New("token expired")
 	}
 
 	return claims, nil

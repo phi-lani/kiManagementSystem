@@ -30,6 +30,7 @@ func InitBlockchain(contractAddress string) {
 
 	// Load the private key from environment variables
 	privateKeyHex := "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e"
+
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
 		log.Fatalf("Failed to load private key: %v", err)

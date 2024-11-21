@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/phi-lani/kimanagementsystem/utils"
 )
@@ -81,19 +82,64 @@ func StartupOnly(next http.Handler) http.Handler {
 	})
 }
 
-// TokenValidationMiddleware is a middleware function that checks for a valid JWT token
+// // TokenValidationMiddleware is a middleware function that checks for a valid JWT token
+// func TokenValidationMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		// Retrieve the token from the cookie
+// 		cookie, err := r.Cookie("token")
+// 		if err != nil {
+// 			log.Println("Unauthorized: No token provided")
+// 			http.Error(w, "Unauthorized: No token provided", http.StatusUnauthorized)
+// 			return
+// 		}
+
+// 		// Verify the token using the VerifyJWT function
+// 		claims, err := utils.VerifyJWT(cookie.Value)
+// 		if err != nil {
+// 			log.Printf("Unauthorized: Invalid token, error: %v", err)
+// 			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
+// 			return
+// 		}
+
+// 		// Extract the userID and role from the claims
+// 		userID := claims.UserID
+// 		role := claims.Role
+
+// 		// Log the extracted userID and role for debugging
+// 		log.Printf("Token valid: userID=%v, role=%v", userID, role)
+
+// 		// Set the userID and role in the request context
+// 		ctx := context.WithValue(r.Context(), "userID", userID)
+// 		ctx = context.WithValue(ctx, "role", role)
+// 		r = r.WithContext(ctx)
+
+// 		// If the token is valid, proceed to the next handler
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
+
 func TokenValidationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Retrieve the token from the cookie
-		cookie, err := r.Cookie("token")
-		if err != nil {
-			log.Println("Unauthorized: No token provided")
-			http.Error(w, "Unauthorized: No token provided", http.StatusUnauthorized)
-			return
+		var token string
+
+		// Check for token in the Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" {
+			// Strip the "Bearer " prefix if present
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			// Fallback to retrieving the token from the cookie
+			cookie, err := r.Cookie("token")
+			if err != nil {
+				log.Println("Unauthorized: No token provided")
+				http.Error(w, "Unauthorized: No token provided", http.StatusUnauthorized)
+				return
+			}
+			token = cookie.Value
 		}
 
 		// Verify the token using the VerifyJWT function
-		claims, err := utils.VerifyJWT(cookie.Value)
+		claims, err := utils.VerifyJWT(token)
 		if err != nil {
 			log.Printf("Unauthorized: Invalid token, error: %v", err)
 			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)

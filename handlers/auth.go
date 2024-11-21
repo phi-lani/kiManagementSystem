@@ -364,103 +364,146 @@ func RegisterStartup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode("Startup registered successfully. Check your email for the OTP code.")
 }
-
 func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 	var req SearchKeyIndividualsRequest
+
+	// Decode the JSON payload
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("Error decoding JSON: %v", err)
-		http.Error(w, "Invalid input", http.StatusBadRequest)
+		http.Error(w, "Invalid input or empty request body", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Search request payload: %+v", req)
+
+	// Validate that at least one search filter is provided
+	if len(req.Qualifications) == 0 && len(req.Experience) == 0 && req.Area == "" && len(req.ClassOfBusiness) == 0 {
+		http.Error(w, "At least one search filter must be provided", http.StatusBadRequest)
 		return
 	}
 
 	// Start building the query
 	query := config.DB.Model(&models.KeyIndividualProfile{})
 
-	// Filter by qualifications if provided
 	if len(req.Qualifications) > 0 {
-		query = query.Where("qualifications && ?", pq.Array(req.Qualifications)) // Using PostgreSQL array overlap operator
+		query = query.Where("qualifications && ?", pq.Array(req.Qualifications))
 	}
-
-	// Filter by experience if provided
 	if len(req.Experience) > 0 {
-		query = query.Where("experience && ?", pq.Array(req.Experience)) // Using PostgreSQL array overlap operator
+		query = query.Where("experience && ?", pq.Array(req.Experience))
 	}
-
-	// Filter by area if provided
 	if req.Area != "" {
 		query = query.Where("area = ?", req.Area)
 	}
-
-	// Filter by class of business if provided
 	if len(req.ClassOfBusiness) > 0 {
-		query = query.Where("class_of_business && ?", pq.Array(req.ClassOfBusiness)) // Using PostgreSQL array overlap operator
+		query = query.Where("class_of_business && ?", pq.Array(req.ClassOfBusiness))
 	}
 
-	// Execute the query and fetch results
 	var keyIndividuals []models.KeyIndividualProfile
 	if err := query.Find(&keyIndividuals).Error; err != nil {
 		http.Error(w, "Error fetching key individuals", http.StatusInternalServerError)
 		return
 	}
 
-	// Respond with the search results
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(keyIndividuals)
 }
 
+// func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
+// 	var req SearchKeyIndividualsRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		log.Printf("Error decoding JSON: %v", err)
+// 		http.Error(w, "Invalid input", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	// Start building the query
+// 	query := config.DB.Model(&models.KeyIndividualProfile{})
+
+// 	// Filter by qualifications if provided
+// 	if len(req.Qualifications) > 0 {
+// 		query = query.Where("qualifications && ?", pq.Array(req.Qualifications)) // Using PostgreSQL array overlap operator
+// 	}
+
+// 	// Filter by experience if provided
+// 	if len(req.Experience) > 0 {
+// 		query = query.Where("experience && ?", pq.Array(req.Experience)) // Using PostgreSQL array overlap operator
+// 	}
+
+// 	// Filter by area if provided
+// 	if req.Area != "" {
+// 		query = query.Where("area = ?", req.Area)
+// 	}
+
+// 	// Filter by class of business if provided
+// 	if len(req.ClassOfBusiness) > 0 {
+// 		query = query.Where("class_of_business && ?", pq.Array(req.ClassOfBusiness)) // Using PostgreSQL array overlap operator
+// 	}
+
+// 	// Execute the query and fetch results
+// 	var keyIndividuals []models.KeyIndividualProfile
+// 	if err := query.Find(&keyIndividuals).Error; err != nil {
+// 		http.Error(w, "Error fetching key individuals", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	// Respond with the search results
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(keyIndividuals)
+// }
+
 // LoginAdmin handles admin login with MFA
-func LoginAdmin(w http.ResponseWriter, r *http.Request) {
-	var req RegistrationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
+// func LoginAdmin(w http.ResponseWriter, r *http.Request) {
+// 	var req RegistrationRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		http.Error(w, "Invalid input", http.StatusBadRequest)
+// 		return
+// 	}
 
-	// Retrieve the user from the database
-	var user models.User
-	if err := config.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		http.Error(w, "User not found", http.StatusUnauthorized)
-		return
-	}
+// 	// Retrieve the user from the database
+// 	var user models.User
+// 	if err := config.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+// 		http.Error(w, "User not found", http.StatusUnauthorized)
+// 		return
+// 	}
 
-	// Check if the user is an admin
-	if user.Role != "admin" {
-		http.Error(w, "Unauthorized: Admin access only", http.StatusForbidden)
-		return
-	}
+// 	// Check if the user is an admin
+// 	if user.Role != "admin" {
+// 		http.Error(w, "Unauthorized: Admin access only", http.StatusForbidden)
+// 		return
+// 	}
 
-	// Verify the password
-	if !utils.CheckPasswordHash(req.Password, user.Password) {
-		http.Error(w, "Invalid password", http.StatusUnauthorized)
-		return
-	}
+// 	// Verify the password
+// 	if !utils.CheckPasswordHash(req.Password, user.Password) {
+// 		http.Error(w, "Invalid password", http.StatusUnauthorized)
+// 		return
+// 	}
 
-	// Check if MFA is enabled for the admin
-	if user.MFAEnabled {
-		// Generate an OTP and send it to the admin's email
-		otpCode := utils.GenerateOTP()
-		user.OTP = otpCode
-		user.OTPExpiry = time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
-		config.DB.Save(&user)
+// 	// Check if MFA is enabled for the admin
+// 	if user.MFAEnabled {
+// 		// Generate an OTP and send it to the admin's email
+// 		otpCode := utils.GenerateOTP()
+// 		user.OTP = otpCode
+// 		user.OTPExpiry = time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
+// 		config.DB.Save(&user)
 
-		// Send the OTP via email
-		utils.SendOTPViaEmail(user.Email, otpCode)
+// 		// Send the OTP via email
+// 		utils.SendOTPViaEmail(user.Email, otpCode)
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode("OTP sent to your email for MFA verification")
-		return
-	}
+// 		w.WriteHeader(http.StatusOK)
+// 		json.NewEncoder(w).Encode("OTP sent to your email for MFA verification")
+// 		return
+// 	}
 
-	// Generate a JWT token if MFA is not required
-	token, err := utils.GenerateJWT(user.ID, user.Username, user.Role)
-	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
-		return
-	}
+// 	// Generate a JWT token if MFA is not required
+// 	token, err := utils.GenerateJWT(user.ID, user.Username, user.Role)
+// 	if err != nil {
+// 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+// 		return
+// 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
-}
+// 	w.WriteHeader(http.StatusOK)
+// 	json.NewEncoder(w).Encode(map[string]string{"token": token})
+// }
 
 // RegisterAdmin registers a new admin user and sends an OTP for MFA
 func RegisterAdmin(w http.ResponseWriter, r *http.Request) {
@@ -532,4 +575,255 @@ func RegisterAdmin(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode("Admin registered successfully. Check your email for the OTP code.")
+}
+
+func LoginAdmin(w http.ResponseWriter, r *http.Request) {
+	var loginRequest struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	// Decode the request body into the loginRequest struct
+	if err := json.NewDecoder(r.Body).Decode(&loginRequest); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Retrieve the user from the database using the provided email
+	var user models.User
+	if err := config.DB.Where("email = ?", loginRequest.Email).First(&user).Error; err != nil {
+		http.Error(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if the user has the "admin" role
+	if user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admin access only", http.StatusForbidden)
+		return
+	}
+
+	// Verify the provided password with the stored hashed password
+	if !utils.CheckPasswordHash(loginRequest.Password, user.Password) {
+		http.Error(w, "Invalid password", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if MFA is enabled for the admin
+	if user.MFAEnabled {
+		// Generate an OTP and set its expiry
+		otpCode := utils.GenerateOTP()
+		user.OTP = otpCode
+		user.OTPExpiry = time.Now().Add(5 * time.Minute) // OTP expires in 5 minutes
+		config.DB.Save(&user)                            // Save the OTP and expiry to the database
+
+		// Send the OTP to the admin's email
+		if err := utils.SendOTPViaEmail(user.Email, otpCode); err != nil {
+			http.Error(w, "Failed to send OTP email", http.StatusInternalServerError)
+			return
+		}
+
+		// Respond to the client that an OTP has been sent
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "OTP sent to your email for MFA verification",
+		})
+		return
+	}
+
+	// If MFA is not required, generate a JWT token and respond
+	token, err := utils.GenerateJWT(user.ID, user.Username, user.Role)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the generated token
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"token": token,
+	})
+}
+
+// func UpdateStartupProfile(w http.ResponseWriter, r *http.Request) {
+// 	// Retrieve the user ID from the context
+// 	userID := r.Context().Value("userID").(uint)
+
+// 	var profile models.StartupProfile
+// 	if err := config.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+// 		http.Error(w, "Profile not found", http.StatusNotFound)
+// 		return
+// 	}
+
+// 	// Decode the incoming request body into the updated profile struct
+// 	var updatedProfile models.StartupProfile
+// 	if err := json.NewDecoder(r.Body).Decode(&updatedProfile); err != nil {
+// 		http.Error(w, "Invalid input", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	// Update all fields
+// 	profile.Name = updatedProfile.Name
+// 	profile.Industry = updatedProfile.Industry
+// 	profile.Website = updatedProfile.Website
+// 	profile.ContactInformation = updatedProfile.ContactInformation
+// 	profile.Area = updatedProfile.Area
+
+// 	// Save the updated profile
+// 	if err := config.DB.Save(&profile).Error; err != nil {
+// 		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte("Profile updated successfully"))
+// }
+
+func UpdateStartupProfile(w http.ResponseWriter, r *http.Request) {
+	// Retrieve the user ID from the request context
+	userID := r.Context().Value("userID").(uint)
+
+	// Fetch the existing profile from the database
+	var profile models.StartupProfile
+	if err := config.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+		http.Error(w, "Profile not found", http.StatusNotFound)
+		return
+	}
+
+	// Decode the request payload
+	var updatedProfile models.StartupProfile
+	if err := json.NewDecoder(r.Body).Decode(&updatedProfile); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Update only the fields that are not empty in the payload
+	if updatedProfile.Name != "" {
+		profile.Name = updatedProfile.Name
+	}
+	if updatedProfile.Industry != "" {
+		profile.Industry = updatedProfile.Industry
+	}
+	if updatedProfile.Website != "" {
+		profile.Website = updatedProfile.Website
+	}
+	if updatedProfile.ContactInformation != "" {
+		profile.ContactInformation = updatedProfile.ContactInformation
+	}
+	if updatedProfile.Area != "" {
+		profile.Area = updatedProfile.Area
+	}
+
+	// Save the updated profile
+	if err := config.DB.Save(&profile).Error; err != nil {
+		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Profile updated successfully"))
+}
+
+// func UpdateKeyIndividualProfile(w http.ResponseWriter, r *http.Request) {
+// 	// Retrieve the user ID from the context
+// 	userID := r.Context().Value("userID").(uint)
+
+// 	var profile models.KeyIndividualProfile
+// 	if err := config.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+// 		http.Error(w, "Profile not found", http.StatusNotFound)
+// 		return
+// 	}
+
+// 	// Decode the incoming request body into the updated profile struct
+// 	var updatedProfile models.KeyIndividualProfile
+// 	if err := json.NewDecoder(r.Body).Decode(&updatedProfile); err != nil {
+// 		http.Error(w, "Invalid input", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	// Update all fields
+// 	profile.FullName = updatedProfile.FullName
+// 	profile.Qualifications = updatedProfile.Qualifications
+// 	profile.Experience = updatedProfile.Experience
+// 	profile.ContactDetails = updatedProfile.ContactDetails
+// 	profile.Area = updatedProfile.Area
+// 	profile.AssetTypes = updatedProfile.AssetTypes
+// 	profile.ClassOfBusiness = updatedProfile.ClassOfBusiness
+// 	profile.REExams = updatedProfile.REExams
+// 	profile.CPDPoints = updatedProfile.CPDPoints
+
+// 	// Save the updated profile
+// 	if err := config.DB.Save(&profile).Error; err != nil {
+// 		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte("Profile updated successfully"))
+// }
+
+func UpdateKeyIndividualProfile(w http.ResponseWriter, r *http.Request) {
+	// Retrieve the user ID from the context
+	userID := r.Context().Value("userID").(uint)
+
+	// Fetch the existing profile from the database
+	var profile models.KeyIndividualProfile
+	if err := config.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+		http.Error(w, "Profile not found", http.StatusNotFound)
+		return
+	}
+
+	// Decode the incoming request body into a temporary struct
+	var updatedProfile struct {
+		FullName        string   `json:"full_name"`
+		Qualifications  []string `json:"qualifications"`
+		Experience      []string `json:"experience"`
+		ContactDetails  string   `json:"contact_details"`
+		Area            string   `json:"area"`
+		AssetTypes      []string `json:"asset_types"`
+		ClassOfBusiness []string `json:"class_of_business"`
+		REExams         []string `json:"re_exams"`
+		CPDPoints       *int     `json:"cpd_points"` // Use a pointer to distinguish between 0 and no update
+	}
+	if err := json.NewDecoder(r.Body).Decode(&updatedProfile); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Update only the fields that are not empty in the payload
+	if updatedProfile.FullName != "" {
+		profile.FullName = updatedProfile.FullName
+	}
+	if len(updatedProfile.Qualifications) > 0 {
+		profile.Qualifications = updatedProfile.Qualifications
+	}
+	if len(updatedProfile.Experience) > 0 {
+		profile.Experience = updatedProfile.Experience
+	}
+	if updatedProfile.ContactDetails != "" {
+		profile.ContactDetails = updatedProfile.ContactDetails
+	}
+	if updatedProfile.Area != "" {
+		profile.Area = updatedProfile.Area
+	}
+	if len(updatedProfile.AssetTypes) > 0 {
+		profile.AssetTypes = updatedProfile.AssetTypes
+	}
+	if len(updatedProfile.ClassOfBusiness) > 0 {
+		profile.ClassOfBusiness = updatedProfile.ClassOfBusiness
+	}
+	if len(updatedProfile.REExams) > 0 {
+		profile.REExams = updatedProfile.REExams
+	}
+	if updatedProfile.CPDPoints != nil {
+		profile.CPDPoints = *updatedProfile.CPDPoints
+	}
+
+	// Save the updated profile
+	if err := config.DB.Save(&profile).Error; err != nil {
+		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Profile updated successfully"))
 }

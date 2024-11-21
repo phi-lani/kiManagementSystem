@@ -4,19 +4,14 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/phi-lani/kimanagementsystem/config"
-	"github.com/phi-lani/kimanagementsystem/handlers"
+	appHandlers "github.com/phi-lani/kimanagementsystem/handlers"
 	"github.com/phi-lani/kimanagementsystem/middleware"
 	"github.com/phi-lani/kimanagementsystem/models"
 )
-
-// Deploy the smart contract
-// npx hardhat ignition deploy ./ignition/modules/KIManagement.ts --network localhost
-
-// Run the ethereum node
-// npx hardhat node
 
 func main() {
 	// Load environment variables
@@ -38,47 +33,56 @@ func main() {
 		&models.OTP{},
 	)
 	if err != nil {
-		// Log a critical error if migration fails
 		log.Fatalf("Critical error during migration: %v", err)
 	}
 
-	//====================================================================================
-	//Smart contract initialization
-	const contractAddress = " 0x5FbDB2315678afecb367f032d93F642f64180aa3" // Replace with your deployed contract address
+	// Smart contract initialization
+	const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3" // Replace with your deployed contract address
 	config.InitBlockchain(contractAddress)
+
 	// Create a new router
 	router := mux.NewRouter()
 
 	// Public routes
-	router.HandleFunc("/register/admin", handlers.RegisterAdmin).Methods("POST")
-	router.HandleFunc("/register/startup", handlers.RegisterStartup).Methods("POST")             // Route for Startup registration
-	router.HandleFunc("/register/keyindividual", handlers.RegisterKeyIndividual).Methods("POST") // Route for Key Individual registration
-	router.HandleFunc("/verify-otp", handlers.VerifyOTP).Methods("POST")
-	router.HandleFunc("/login", handlers.Login).Methods("POST")
-	//router.HandleFunc("/send-otp", handlers.SendOTP).Methods("GET") // Route for sending OTP
+	router.HandleFunc("/register/admin", appHandlers.RegisterAdmin).Methods("POST")
+	router.HandleFunc("/register/startup", appHandlers.RegisterStartup).Methods("POST")
+	router.HandleFunc("/register/keyindividual", appHandlers.RegisterKeyIndividual).Methods("POST")
+	router.HandleFunc("/verify-otp", appHandlers.VerifyOTP).Methods("POST")
+	router.HandleFunc("/login", appHandlers.Login).Methods("POST")
 
 	// Protected routes using middleware for token validation
-	router.Handle("/uploadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.UploadDocument))).Methods("POST")
-	router.Handle("/viewProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.ViewProfile))).Methods("GET")
-	router.Handle("/updateProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.UpdateProfile))).Methods("PUT")
-	router.Handle("/downloadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(handlers.DownloadDocument))).Methods("GET")
+	router.Handle("/uploadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.UploadDocument))).Methods("POST")
+	router.Handle("/viewProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.ViewProfile))).Methods("GET")
+	router.Handle("/updateProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.UpdateKeyIndividualProfile))).Methods("PUT")
+	router.Handle("/downloadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.DownloadDocument))).Methods("GET")
+
+	// router.Handle("/uploadDocument", http.HandlerFunc(appHandlers.UploadDocument)).Methods("POST")
+	// router.Handle("/viewProfile", http.HandlerFunc(appHandlers.ViewProfile)).Methods("GET")
+	// router.Handle("/updateProfile", http.HandlerFunc(appHandlers.UpdateKeyIndividualProfile)).Methods("PUT")
+	// router.Handle("/downloadDocument", http.HandlerFunc(appHandlers.DownloadDocument)).Methods("GET")
 
 	// Startup-specific routes
 	startupRouter := router.PathPrefix("/startup").Subrouter()
 	startupRouter.Use(middleware.TokenValidationMiddleware)
 	startupRouter.Use(middleware.StartupOnly)
-	startupRouter.HandleFunc("/searchKeyIndividuals", handlers.SearchKeyIndividuals).Methods("GET")
-	startupRouter.HandleFunc("/sendMessage", handlers.SendMessage).Methods("POST") // Route to send messages
+	startupRouter.HandleFunc("/searchKeyIndividuals", appHandlers.SearchKeyIndividuals).Methods("GET")
+	startupRouter.HandleFunc("/sendMessage", appHandlers.SendMessage).Methods("POST")
 
 	// Admin-only routes (secured with token validation and role check)
 	adminRouter := router.PathPrefix("/admin").Subrouter()
-	adminRouter.Use(middleware.TokenValidationMiddleware) // Ensure the user is authenticated
-	adminRouter.Use(middleware.AdminOnly)                 // Ensure the user has an admin role
-	adminRouter.HandleFunc("/viewUnverifiedDocuments", handlers.ViewUnverifiedDocuments).Methods("GET")
-	adminRouter.HandleFunc("/verifyDocument", handlers.VerifyDocument).Methods("POST")
-	//adminRouter.HandleFunc("/downloadLogs", handlers.DownloadLogs).Methods("GET")
+	adminRouter.Use(middleware.TokenValidationMiddleware)
+	adminRouter.Use(middleware.AdminOnly)
+	adminRouter.HandleFunc("/login", appHandlers.LoginAdmin).Methods("POST")
+	startupRouter.HandleFunc("/updateProfile", appHandlers.UpdateStartupProfile).Methods("PUT")
+	adminRouter.HandleFunc("/viewUnverifiedDocuments", appHandlers.ViewUnverifiedDocuments).Methods("GET")
+	adminRouter.HandleFunc("/verifyDocument", appHandlers.VerifyDocument).Methods("POST")
 
-	// Start the server
+	// CORS configuration
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
+	originsOk := handlers.AllowedOrigins([]string{"http://localhost:3000"}) // Replace "*" with specific domains for production
+	methodsOk := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
+
+	// Start the server with CORS enabled
 	log.Println("Server is running on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(http.ListenAndServe(":8080", handlers.CORS(headersOk, originsOk, methodsOk)(router)))
 }
