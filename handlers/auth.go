@@ -658,23 +658,68 @@ func UpdateKeyIndividualProfile(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Profile updated successfully"))
 }
 
-// ViewMessages retrieves all messages sent to the Key Individual
+// func ViewMessages(w http.ResponseWriter, r *http.Request) {
+// 	// Retrieve the user ID from the context (set by middleware)
+// 	userID, ok := r.Context().Value("userID").(uint)
+// 	if !ok || userID == 0 {
+// 		http.Error(w, "Invalid user ID", http.StatusUnauthorized)
+// 		return
+// 	}
+
+// 	// Fetch the Key Individual Profile associated with the user ID
+// 	var keyIndividualProfile models.KeyIndividualProfile
+// 	if err := config.DB.Where("user_id = ?", userID).First(&keyIndividualProfile).Error; err != nil {
+// 		http.Error(w, "Key Individual Profile not found", http.StatusNotFound)
+// 		return
+// 	}
+
+// 	// Use the keyIndividualProfile.ID to query the messages table
+// 	var messages []models.Message
+// 	if err := config.DB.Where("recipient_id = ?", keyIndividualProfile.ID).Find(&messages).Error; err != nil {
+// 		http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
+// 		return
+// 	}
+
+//		// Respond with the messages in JSON format
+//		w.Header().Set("Content-Type", "application/json")
+//		json.NewEncoder(w).Encode(messages)
+//	}
+type MessageResponse struct {
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+	From    string `json:"from"` // Startup name
+	SentAt  string `json:"sent_at"`
+}
+
 func ViewMessages(w http.ResponseWriter, r *http.Request) {
-	// Retrieve the user ID from the token context
-	// userID := r.Context().Value("userID").(uint)
-	// keyIndividualID, ok := r.Context().Value("keyIndividualID").(uint)
-	// if !ok || keyIndividualID == 0 {
-	// 	http.Error(w, "Invalid Key Individual ID", http.StatusInternalServerError)
-	// 	return
-	// }
-	// Fetch messages where the recipient is the Key Individual
-	var messages []models.Message
-	if err := config.DB.Where("recipient_id = ?", 1).Find(&messages).Error; err != nil {
+	// Retrieve the Key Individual's user ID from the context
+	keyIndividualUserID, ok := r.Context().Value("userID").(uint)
+	if !ok || keyIndividualUserID == 0 {
+		http.Error(w, "Invalid user ID", http.StatusUnauthorized)
+		return
+	}
+
+	// Get the Key Individual's profile ID
+	var keyIndividualProfile models.KeyIndividualProfile
+	if err := config.DB.Where("user_id = ?", keyIndividualUserID).First(&keyIndividualProfile).Error; err != nil {
+		http.Error(w, "Key Individual profile not found", http.StatusNotFound)
+		return
+	}
+
+	// Query messages and include the startup name
+	var messages []MessageResponse
+	if err := config.DB.
+		Table("messages").
+		Select("messages.subject, messages.body, startup_profiles.name AS from, messages.sent_at").
+		Joins("JOIN startup_profiles ON messages.sender_id = startup_profiles.user_id").
+		Where("messages.recipient_id = ?", keyIndividualProfile.ID).
+		Scan(&messages).Error; err != nil {
+		log.Printf("Error fetching messages: %v", err)
 		http.Error(w, "Error fetching messages", http.StatusInternalServerError)
 		return
 	}
 
-	// Respond with the messages in JSON format
-	w.Header().Set("Content-Type", "application/json")
+	// Respond with the messages
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(messages)
 }
