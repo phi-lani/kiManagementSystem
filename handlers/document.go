@@ -98,7 +98,7 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 func DownloadDocument(w http.ResponseWriter, r *http.Request) {
 	// Retrieve user ID from context (set by TokenValidationMiddleware)
-	userID := r.Context().Value("userID").(uint)
+	//userID := r.Context().Value("userID").(uint)
 
 	// Get the document ID from the URL query parameters
 	documentIDStr := r.URL.Query().Get("documentID")
@@ -116,7 +116,7 @@ func DownloadDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve the document from the database
 	var document models.UserDocument
-	if err := config.DB.Where("id = ? AND user_id = ?", uint(documentID), userID).First(&document).Error; err != nil {
+	if err := config.DB.Where("id = ?", uint(documentID)).First(&document).Error; err != nil {
 		http.Error(w, "Document not found", http.StatusNotFound)
 		return
 	}

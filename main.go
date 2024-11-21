@@ -73,18 +73,20 @@ func main() {
 	startupRouter.Use(middleware.StartupOnly)
 	startupRouter.HandleFunc("/searchKeyIndividuals", appHandlers.SearchKeyIndividuals).Methods("GET")
 	startupRouter.HandleFunc("/sendMessage", appHandlers.SendMessage).Methods("POST")
+	startupRouter.HandleFunc("/updateProfile", appHandlers.UpdateStartupProfile).Methods("PUT")
 
 	// Admin-only routes (secured with token validation and role check)
 	adminRouter := router.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(middleware.TokenValidationMiddleware)
 	adminRouter.Use(middleware.AdminOnly)
 	adminRouter.HandleFunc("/login", appHandlers.LoginAdmin).Methods("POST")
-	startupRouter.HandleFunc("/updateProfile", appHandlers.UpdateStartupProfile).Methods("PUT")
+	adminRouter.HandleFunc("/dashboard", appHandlers.AdminDashboard).Methods("GET")
 	adminRouter.HandleFunc("/viewUnverifiedDocuments", appHandlers.ViewUnverifiedDocuments).Methods("GET")
 	adminRouter.HandleFunc("/verifyDocument", appHandlers.VerifyDocument).Methods("POST")
+	//adminRouter.HandleFunc("/verifyDocument", appHandlers.VerifyDocument).Methods("POST")
 
 	// CORS configuration
-	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization", "X-API-Key"})
 	originsOk := handlers.AllowedOrigins([]string{"http://localhost:3000"}) // Replace "*" with specific domains for production
 	methodsOk := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
 

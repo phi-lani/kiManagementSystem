@@ -409,6 +409,7 @@ func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 
 // RegisterAdmin registers a new admin user and sends an OTP for MFA
 func RegisterAdmin(w http.ResponseWriter, r *http.Request) {
+	log.Printf("inside admin register")
 	// Check for the API key in the request headers
 	apiKey := r.Header.Get("X-API-Key")
 	if apiKey != os.Getenv("ADMIN_API_KEY") {
