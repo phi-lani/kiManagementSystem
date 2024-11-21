@@ -364,49 +364,51 @@ func RegisterStartup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode("Startup registered successfully. Check your email for the OTP code.")
 }
-func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
-	var req SearchKeyIndividualsRequest
 
-	// Decode the JSON payload
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("Error decoding JSON: %v", err)
-		http.Error(w, "Invalid input or empty request body", http.StatusBadRequest)
-		return
-	}
+// func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
+// 	log.Println("SearchKeyIndividuals endpoint hit")
+// 	var req SearchKeyIndividualsRequest
 
-	log.Printf("Search request payload: %+v", req)
+// 	// Decode the JSON payload
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		log.Printf("Error decoding JSON: %v", err)
+// 		http.Error(w, "Invalid input or empty request body", http.StatusBadRequest)
+// 		return
+// 	}
 
-	// Validate that at least one search filter is provided
-	if len(req.Qualifications) == 0 && len(req.Experience) == 0 && req.Area == "" && len(req.ClassOfBusiness) == 0 {
-		http.Error(w, "At least one search filter must be provided", http.StatusBadRequest)
-		return
-	}
+// 	log.Printf("Search request payload: %+v", req)
 
-	// Start building the query
-	query := config.DB.Model(&models.KeyIndividualProfile{})
+// 	// Validate that at least one search filter is provided
+// 	if len(req.Qualifications) == 0 && len(req.Experience) == 0 && req.Area == "" && len(req.ClassOfBusiness) == 0 {
+// 		http.Error(w, "At least one search filter must be provided", http.StatusBadRequest)
+// 		return
+// 	}
 
-	if len(req.Qualifications) > 0 {
-		query = query.Where("qualifications && ?", pq.Array(req.Qualifications))
-	}
-	if len(req.Experience) > 0 {
-		query = query.Where("experience && ?", pq.Array(req.Experience))
-	}
-	if req.Area != "" {
-		query = query.Where("area = ?", req.Area)
-	}
-	if len(req.ClassOfBusiness) > 0 {
-		query = query.Where("class_of_business && ?", pq.Array(req.ClassOfBusiness))
-	}
+// 	// Start building the query
+// 	query := config.DB.Model(&models.KeyIndividualProfile{})
 
-	var keyIndividuals []models.KeyIndividualProfile
-	if err := query.Find(&keyIndividuals).Error; err != nil {
-		http.Error(w, "Error fetching key individuals", http.StatusInternalServerError)
-		return
-	}
+// 	if len(req.Qualifications) > 0 {
+// 		query = query.Where("qualifications && ?", pq.Array(req.Qualifications))
+// 	}
+// 	if len(req.Experience) > 0 {
+// 		query = query.Where("experience && ?", pq.Array(req.Experience))
+// 	}
+// 	if req.Area != "" {
+// 		query = query.Where("area = ?", req.Area)
+// 	}
+// 	if len(req.ClassOfBusiness) > 0 {
+// 		query = query.Where("class_of_business && ?", pq.Array(req.ClassOfBusiness))
+// 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(keyIndividuals)
-}
+// 	var keyIndividuals []models.KeyIndividualProfile
+// 	if err := query.Find(&keyIndividuals).Error; err != nil {
+// 		http.Error(w, "Error fetching key individuals", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(keyIndividuals)
+// }
 
 // func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 // 	var req SearchKeyIndividualsRequest
@@ -504,6 +506,48 @@ func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
 // 	w.WriteHeader(http.StatusOK)
 // 	json.NewEncoder(w).Encode(map[string]string{"token": token})
 // }
+
+func SearchKeyIndividuals(w http.ResponseWriter, r *http.Request) {
+	// Parse the query parameters
+	qualifications := r.URL.Query()["qualifications"]
+	experience := r.URL.Query()["experience"]
+	area := r.URL.Query().Get("area")
+	classOfBusiness := r.URL.Query()["class_of_business"]
+
+	log.Printf("Search parameters: Qualifications=%v, Experience=%v, Area=%v, ClassOfBusiness=%v",
+		qualifications, experience, area, classOfBusiness)
+
+	// Build the query dynamically
+	query := config.DB.Model(&models.KeyIndividualProfile{})
+
+	if len(qualifications) > 0 {
+		query = query.Where("qualifications && ?", pq.Array(qualifications))
+	}
+
+	if len(experience) > 0 {
+		query = query.Where("experience && ?", pq.Array(experience))
+	}
+
+	if area != "" {
+		query = query.Where("area = ?", area)
+	}
+
+	if len(classOfBusiness) > 0 {
+		query = query.Where("class_of_business && ?", pq.Array(classOfBusiness))
+	}
+
+	// Fetch the results
+	var keyIndividuals []models.KeyIndividualProfile
+	if err := query.Find(&keyIndividuals).Error; err != nil {
+		log.Printf("Error fetching key individuals: %v", err)
+		http.Error(w, "Error fetching key individuals", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the search results
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(keyIndividuals)
+}
 
 // RegisterAdmin registers a new admin user and sends an OTP for MFA
 func RegisterAdmin(w http.ResponseWriter, r *http.Request) {
