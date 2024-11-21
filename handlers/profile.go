@@ -146,3 +146,36 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	// Respond with a success message
 	json.NewEncoder(w).Encode("Profile updated successfully")
 }
+
+func ViewKeyIndividualProfile(w http.ResponseWriter, r *http.Request) {
+	// Retrieve the token from the Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Unauthorized: No token provided", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract the token (remove the "Bearer " prefix)
+	tokenString := authHeader[len("Bearer "):]
+
+	// Parse and verify the token
+	claims, err := utils.VerifyJWT(tokenString)
+	if err != nil {
+		http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	// Retrieve the username from the claims
+	userID := claims.UserID
+
+	// Find the user by username
+	var profile models.KeyIndividualProfile
+	if err := config.DB.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Respond with the user profile in JSON format
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(profile)
+}

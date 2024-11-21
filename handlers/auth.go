@@ -657,3 +657,24 @@ func UpdateKeyIndividualProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Profile updated successfully"))
 }
+
+// ViewMessages retrieves all messages sent to the Key Individual
+func ViewMessages(w http.ResponseWriter, r *http.Request) {
+	// Retrieve the user ID from the token context
+	// userID := r.Context().Value("userID").(uint)
+	// keyIndividualID, ok := r.Context().Value("keyIndividualID").(uint)
+	// if !ok || keyIndividualID == 0 {
+	// 	http.Error(w, "Invalid Key Individual ID", http.StatusInternalServerError)
+	// 	return
+	// }
+	// Fetch messages where the recipient is the Key Individual
+	var messages []models.Message
+	if err := config.DB.Where("recipient_id = ?", 1).Find(&messages).Error; err != nil {
+		http.Error(w, "Error fetching messages", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the messages in JSON format
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
+}

@@ -53,13 +53,19 @@ func main() {
 	// Protected routes using middleware for token validation
 	router.Handle("/uploadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.UploadDocument))).Methods("POST")
 	router.Handle("/viewProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.ViewProfile))).Methods("GET")
-	router.Handle("/updateProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.UpdateKeyIndividualProfile))).Methods("PUT")
+	router.Handle("/keyindividual/updateProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.UpdateKeyIndividualProfile))).Methods("PUT")
 	router.Handle("/downloadDocument", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.DownloadDocument))).Methods("GET")
-
+	router.Handle("/keyindividual/viewProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.ViewKeyIndividualProfile))).Methods("GET")
+	//router.Handle("/keyindividual/viewProfile", middleware.TokenValidationMiddleware(http.HandlerFunc(appHandlers.ViewKeyIndividualProfile))).Methods("GET")
 	// router.Handle("/uploadDocument", http.HandlerFunc(appHandlers.UploadDocument)).Methods("POST")
 	// router.Handle("/viewProfile", http.HandlerFunc(appHandlers.ViewProfile)).Methods("GET")
 	// router.Handle("/updateProfile", http.HandlerFunc(appHandlers.UpdateKeyIndividualProfile)).Methods("PUT")
 	// router.Handle("/downloadDocument", http.HandlerFunc(appHandlers.DownloadDocument)).Methods("GET")
+
+	keyIndividualRouter := router.PathPrefix("/keyindividual").Subrouter()
+	keyIndividualRouter.Use(middleware.TokenValidationMiddleware)
+	keyIndividualRouter.Use(middleware.KeyIndividualOnly)
+	keyIndividualRouter.HandleFunc("/messages", appHandlers.ViewMessages).Methods("GET")
 
 	// Startup-specific routes
 	startupRouter := router.PathPrefix("/startup").Subrouter()
